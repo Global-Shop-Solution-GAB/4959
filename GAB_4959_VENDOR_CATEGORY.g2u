@@ -1,0 +1,207 @@
+Program.Sub.ScreenSU.Start
+Gui.F_Setup..Create
+Gui.F_Setup..Caption("Vendor Category Setup [APAC]")
+Gui.F_Setup..Size(7455,8670)
+Gui.F_Setup..MinX(0)
+Gui.F_Setup..MinY(0)
+Gui.F_Setup..Position(0,0)
+Gui.F_Setup..FontSize(9)
+Gui.F_Setup..BackColor(-2147483633)
+Gui.F_Setup..MousePointer(0)
+Gui.F_Setup..Event(UnLoad,F_SetupUnload)
+Gui.F_Setup.GsGCSetup.Create(GsGridControl)
+Gui.F_Setup.GsGCSetup.Size(7050,7890)
+Gui.F_Setup.GsGCSetup.Position(75,105)
+Gui.F_Setup.GsGCSetup.Event(CellValueChanged,GsGCSetup_CellValueChanged)
+Gui.F_Setup.GsGCSetup.Event(RowCellClick,GsGCsetup_RowCellClick)
+Gui.F_Category..Create
+Gui.F_Category..Caption("Vendor Category [APAC]")
+Gui.F_Category..Size(5655,1560)
+Gui.F_Category..MinX(0)
+Gui.F_Category..MinY(0)
+Gui.F_Category..Position(0,0)
+Gui.F_Category..BackColor(-2147483633)
+Gui.F_Category..MousePointer(0)
+Gui.F_Category..Event(UnLoad,F_CategoryUnload)
+Gui.F_Category.lbl1.Create(Label,"Category",True,1935,255,0,75,165,True,0,"Arial",9,-2147483633,0)
+Gui.F_Category.ddl1.Create(DropDownList)
+Gui.F_Category.ddl1.Size(5145,345)
+Gui.F_Category.ddl1.Position(135,405)
+Gui.F_Category.ddl1.Event(Click,ddlClick)
+Gui.F_Category.ddl1.FontSize(9)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+V.Global.sCategory.Declare
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+V.Local.sIcon.Declare
+
+'Vendor master populate
+F.Intrinsic.Control.If(V.Caller.Hook,=,14460)
+	V.Passed.000022.Set("Category")
+'Vendor master script 1
+F.Intrinsic.Control.ElseIf(V.Caller.Hook,=,14480)
+	F.odbc.Connection!conx.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+	F.Intrinsic.String.Build("{0}\ART\gss2.ico",V.Caller.GlobalDir,V.Local.sIcon)
+	Gui.F_Category..Icon(V.Local.sIcon)
+	
+	F.Intrinsic.Control.CallSub(loadcategory)
+	
+	Gui.F_Category..Show
+'New hook
+F.Intrinsic.Control.Else
+	F.odbc.Connection!conx.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+	F.Intrinsic.String.Build("{0}\ART\gss2.ico",V.Caller.GlobalDir,V.Local.sIcon)
+	Gui.F_Setup..Icon(V.Local.sIcon)
+	
+	F.Intrinsic.Control.CallSub(loadsetup)
+	
+	Gui.F_Setup..Show
+F.Intrinsic.Control.EndIf
+Program.Sub.Main.End
+
+Program.Sub.LoadSetup.Start
+V.Local.iID.Declare
+
+F.Data.DataTable.CreateFromSQL("dtSetup","conx","select id as ID, description as Description, description as Previous from GAB_4959_CATEGORY order by id",True)
+
+'No category has been setup previously
+F.Intrinsic.Control.If(V.DataTable.dtSetup.RowCount,=,0)
+	F.Data.DataTable.AddRow("dtSetup","ID",1,"Description","","Previous","")
+'There is a category setup previously
+F.Intrinsic.Control.Else
+	F.Intrinsic.Math.Add(V.DataTable.dtSetup(V.DataTable.dtSetup.RowCount--).ID!FieldVal,1,V.Local.iID)
+	F.Data.DataTable.AddRow("dtSetup","ID",V.Local.iID,"Description","","Previous","")
+F.Intrinsic.Control.EndIf
+
+F.Data.DataTable.AddColumn("dtSetup","Delete","Long",0)
+
+Gui.F_Setup.GsGCSetup.AddGridviewFromDatatable("gvSetup","dtSetup")
+Gui.F_Setup.GsGCSetup.MainView("gvSetup")
+Gui.F_Setup.GsGCSetup.SetColumnProperty("gvSetup","Previous","Visible",False)
+Gui.F_Setup.GsGCSetup.SetColumnProperty("gvSetup","ID","HeaderHAlignment","Center")
+Gui.F_Setup.GsGCSetup.SetColumnProperty("gvSetup","Description","HeaderHAlignment","Center")
+Gui.F_Setup.GsGCSetup.SetColumnProperty("gvSetup","ID","CellHAlignment","Center")
+Gui.F_Setup.GsGCSetup.SetColumnProperty("gvSetup","Description","AllowEdit",True)
+Gui.F_Setup.GsGCSetup.SetColumnProperty("gvSetup","Description","ReadOnly",False)
+Gui.F_Setup.GsGCSetup.SetColumnProperty("gvSetup","Delete","AllowEdit",False)
+Gui.F_Setup.GsGCSetup.SetColumnProperty("gvSetup","Delete","ShowCaption",False)
+Gui.F_Setup.GsGCSetup.SetColumnProperty("gvSetup","ID","MinWidth","60")
+Gui.F_Setup.GsGCSetup.SetColumnProperty("gvSetup","Description","MinWidth","200")
+Gui.F_Setup.GsGCSetup.ColumnEdit("gvSetup","Delete","EditorButton","Delete")
+Program.Sub.LoadSetup.End
+
+Program.Sub.F_SetupUnload.Start
+F.Data.DataTable.Close("dtSetup")
+F.ODBC.Connection!conx.Close
+F.Intrinsic.Control.End
+
+Program.Sub.F_SetupUnload.End
+
+Program.Sub.GsGCSetup_CellValueChanged.Start
+V.Local.iID.Declare
+V.Local.sAfter.Declare
+V.Local.sBefore.Declare
+V.Local.sSQL.Declare
+V.Local.sValue.Declare
+
+F.Intrinsic.Control.If(V.Args.Column,=,"Description")
+	V.Local.sValue.Set(V.Args.Value)
+	F.Intrinsic.Control.If(V.Local.sValue.Trim,<>,"")
+		F.Intrinsic.String.LCase(V.Local.sValue.Trim,V.Local.sAfter)
+		F.Intrinsic.String.LCase(V.DataTable.dtSetup(V.Args.RowIndex).Previous!FieldValTrim,V.Local.sBefore)
+		'Check if before is different from after
+		F.Intrinsic.Control.If(V.Local.sAfter,<>,V.Local.sBefore)
+			'New entry
+			F.Intrinsic.Control.If(V.Local.sBefore.Trim,=,"")
+				F.Intrinsic.String.Build("insert into GAB_4959_CATEGORY(id,description) values({0},'{1}');",V.DataTable.dtSetup(V.Args.RowIndex).ID!FieldValLong,V.Local.sValue.Trim,V.Local.sSQL)
+				F.Intrinsic.Math.Add(V.DataTable.dtSetup(V.DataTable.dtSetup.RowCount--).ID!FieldVal,1,V.Local.iID)
+				F.Data.DataTable.AddRow("dtSetup","ID",V.Local.iID,"Description","","Previous","")
+			'Updated entry
+			F.Intrinsic.Control.Else
+				F.Intrinsic.String.Build("update GAB_4959_CATEGORY set description = '{1}' where id = {0}",V.DataTable.dtSetup(V.Args.RowIndex).ID!FieldValLong,V.Local.sValue.Trim,V.Local.sSQL)
+				
+			F.Intrinsic.Control.EndIf
+			F.Data.DataTable.SetValue("dtSetup",V.Args.RowIndex,"Previous",V.Local.sValue.Trim)
+			F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+Program.Sub.GsGCSetup_CellValueChanged.End
+
+Program.Sub.GsGCsetup_RowCellClick.Start
+V.Local.sSQL.Declare
+
+F.Intrinsic.Control.If(V.Args.Column,=,"Delete")
+	F.Intrinsic.Control.If(V.DataTable.dtSetup(V.Args.RowIndex).Previous!FieldValTrim,<>,"")
+		F.Intrinsic.String.Build("delete from GAB_4959_CATEGORY where id = {0}",V.DataTable.dtSetup(V.Args.RowIndex).ID!FieldValLong,V.Local.sSQL)
+		F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+		F.Data.DataTable.DeleteRow("dtSetup",V.Args.RowIndex)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+Program.Sub.GsGCsetup_RowCellClick.End
+
+Program.Sub.LoadCategory.Start
+V.Local.iID.Declare
+V.Local.sSQL.Declare
+
+F.Data.Dictionary.CreateFromSQL("dicCategory","conx","select ID, Description from GAB_4959_CATEGORY order by id")
+Gui.F_Category.ddl1.AddItems("Dictionary","dicCategory")
+F.Data.Dictionary.Close("dicCategory")
+
+F.Intrinsic.String.Build("select category from GAB_4959_VENDOR_CAT where vendor = '{0}'",V.Passed.000002.Trim,V.Local.sSQL)
+F.ODBC.Connection!conx.OpenLocalRecordsetRO("rst",V.Local.sSQL)
+F.Intrinsic.Control.If(V.ODBC.conx!rst.EOF,=,False)
+	F.Intrinsic.String.Build("select description from GAB_4959_CATEGORY where id = {0}",V.ODBC.conx!rst.FieldValLong!category,V.Local.sSQL)
+	F.ODBC.conx!rst.Close
+	F.ODBC.Connection!conx.OpenLocalRecordsetRO("rst",V.Local.sSQL)
+	Gui.F_Category.ddl1.Text(V.ODBC.conx!rst.FieldValTrim!description)
+	V.Global.sCategory.Set(V.ODBC.conx!rst.FieldValTrim!description)
+
+F.Intrinsic.Control.EndIf
+F.ODBC.conx!rst.Close
+Program.Sub.LoadCategory.End
+
+Program.Sub.F_CategoryUnload.Start
+F.ODBC.Connection!conx.Close
+F.Intrinsic.Control.End
+
+Program.Sub.F_CategoryUnload.End
+
+Program.Sub.ddlClick.Start
+V.Local.iID.Declare
+V.Local.sSelection.Declare
+V.Local.sSQL.Declare
+
+V.Local.sSelection.Set(V.Screen.F_Category!ddl1.Text)
+F.Intrinsic.Control.If(V.Local.sSelection.Trim,<>,V.Global.sCategory.Trim)
+	Gui.F_Category.ddl1.Enabled(False)
+	
+	'Get category ID
+	F.Intrinsic.String.Build("select id from GAB_4959_CATEGORY where description = '{0}'",V.Local.sSelection.Trim,V.Local.sSQL)
+	F.ODBC.Connection!conx.OpenLocalRecordsetRO("rst",V.Local.sSQL)
+	V.Local.iID.Set(V.ODBC.conx!rst.FieldValLong!id)
+	F.ODBC.conx!rst.Close
+	
+	F.Intrinsic.String.Build("select category from GAB_4959_VENDOR_CAT where vendor = '{0}'",V.Passed.000002.Trim,V.Local.sSQL)
+	F.ODBC.Connection!conx.OpenLocalRecordsetRO("rst",V.Local.sSQL)
+	F.Intrinsic.Control.If(V.ODBC.conx!rst.EOF,=,True)
+		F.Intrinsic.String.Build("insert into GAB_4959_VENDOR_CAT(vendor,category) values('{0}',{1});",V.Passed.000002.Trim,V.Local.iID,V.Local.sSQL)	
+	F.Intrinsic.Control.Else
+		F.Intrinsic.String.Build("update GAB_4959_VENDOR_CAT set category = {1} where vendor = '{0}';",V.Passed.000002.Trim,V.Local.iID,V.Local.sSQL)
+	F.Intrinsic.Control.EndIf
+	F.ODBC.conx!rst.Close
+	
+	F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+	V.Global.sCategory.Set(V.Local.sSelection.Trim)	
+	
+	Gui.F_Category.ddl1.Enabled(True)
+F.Intrinsic.Control.EndIf
+Program.Sub.ddlClick.End
+
+Program.Sub.Comments.Start
+${$0$}$Custom Category in Vendor Master$}$MHERTANTO$}$9/2/2018 2:14:36 PM$}$False
+${$3$}$0$}$$}$0$}$-1$}$$}$12:00:00 AM$}$This program ties custom category defined by user to vendor in vendor master.
+Program.Sub.Comments.End
